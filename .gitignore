@@ -1,0 +1,21 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+
+# Environment
+.env
+.venv/
+venv/
+
+# Data (never commit real user data)
+data/
+
+
+# Others
+dist/
+.uv/
