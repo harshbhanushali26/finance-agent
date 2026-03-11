@@ -64,6 +64,7 @@ class ExpenseBridge:
                 return True
         return False
 
+
     def suggest_category(self, type_: str, name: str) -> list[str]:
         """Return existing categories similar to the given name."""
         name = name.strip().lower()
@@ -74,7 +75,6 @@ class ExpenseBridge:
         )
         matches = [c for c in cats if name in c.lower() or c.lower() in name]
         return matches[:3]
-
 
 
     # ── CRUD Operations ────────────────────────────────────────────────────────

@@ -5,15 +5,20 @@ Supports special commands for quick actions and navigation.
 """
 
 import sys
-from rich.prompt import Prompt
-from rich.panel import Panel
-from rich.table import Table
+import json
 from rich import box
+from pathlib import Path
+from rich.table import Table
+from rich.panel import Panel
+from rich.prompt import Prompt
+from calendar import monthrange
+from datetime import datetime, timedelta
 
-from bridge.expense_bridge import ExpenseBridge
-from bridge.auth_helper import login
-from agent.session import Session
 from agent import core
+from agent.session import Session
+from tools.budget import _carry_forward_budgets
+from bridge.auth_helper import login
+from bridge.expense_bridge import ExpenseBridge
 from agent.cli import (
     agent_success, agent_info,
     agent_error, agent_status, agent_thinking,
@@ -131,9 +136,6 @@ def show_dashboard(session: Session):
 
 def show_budget(session: Session):
     """Display budget status directly from bridge."""
-    from datetime import datetime
-    import json
-    from pathlib import Path
 
     month = datetime.now().strftime("%Y-%m")
     month_label = datetime.now().strftime("%B %Y")
@@ -148,12 +150,42 @@ def show_budget(session: Session):
         monthly = session.bridge.get_monthly_summary(month)
         breakdown = monthly.get("breakdown", {})
 
+        # ── Carry forward on 1st of month ──
+        carried = _carry_forward_budgets(session.user_id, session)
+        if carried:
+            console.print(f"[cyan]↩ Carried forward from last month: {', '.join(carried)}[/cyan]")
+            console.print()
+            # reload budgets after carry-forward
+            budgets = json.loads(budget_file.read_text()).get(month, {})
+
+        # ── Budget set reminder ──
+        all_budgets = set(budgets.keys())
+        unbudgeted = []
+        for cat, amount in breakdown.items():
+            if cat not in all_budgets and amount > 0:
+                # count transactions for this category this month
+                txns = session.bridge.filter_txn(type="expense", category=cat, month=month)
+                if len(txns) >= 3:
+                    unbudgeted.append(f"{cat} (₹{amount:,.0f} spent, {len(txns)} transactions)")
+
+        if unbudgeted:
+            console.print(f"[yellow]⚠ No budget set for: {', '.join(unbudgeted)}[/yellow]")
+            console.print(f"[dim]  Try: set {unbudgeted[0].split(' ')[0].lower()} budget to 5000[/dim]")
+            console.print()
+
+        # ── Date calculations ──────────────────────────────────────────────
+        today = datetime.now()
+        days_passed = today.day     # Date only i.e, 11 <- (2026-03-11)
+        days_in_month = monthrange(today.year, today.month)[1]  # No of days in current month
+        days_remaining = days_in_month - days_passed
+
         lines = []
         for category, limit in budgets.items():
             spent = breakdown.get(category, 0)
             percent = (spent / limit * 100) if limit > 0 else 0
             remaining = limit - spent
-            bar = "█" * int(percent / 10) + "░" * (10 - int(percent / 10))
+            filled = round(percent / 10)
+            bar = "█" * filled + "░" * (10 - filled)
 
             if spent > limit:
                 status = "[bold red]OVER[/bold red]"
@@ -170,6 +202,34 @@ def show_budget(session: Session):
                 f"₹{spent:,.0f} / ₹{limit:,.0f}  {status}  "
                 f"[dim]₹{remaining:,.0f} left[/dim]"
             )
+
+            # ── Overspend trend ──
+            if days_passed > 0 and spent < limit:
+                cat_daily = spent / days_passed
+                cat_daily_allowed = limit / days_in_month
+                if cat_daily > cat_daily_allowed:
+                    days_to_exceed = (limit - spent) / cat_daily
+                    exceed_date = (today + timedelta(days=days_to_exceed)).strftime("%d %b")
+                    lines.append(f"  [dim]↑ At this rate, {category} exceeded by {exceed_date}[/dim]")
+
+
+        # ── Burn Rate ──────────────────────────────────────────────
+        total_budget = sum(budgets.values())
+        total_spent = sum(breakdown.get(cat, 0) for cat in budgets)
+
+        daily_actual = total_spent / days_passed if days_passed > 0 else 0
+        daily_allowed = total_budget / days_in_month
+
+        burn_line = (
+            f"[dim]Burn rate[/dim]  "
+            f"[yellow]₹{daily_actual:,.0f}/day[/yellow] actual  "
+            f"[dim]vs[/dim]  "
+            f"[green]₹{daily_allowed:,.0f}/day[/green] allowed  "
+            f"[dim]· {days_remaining} days left[/dim]"
+        )
+
+        lines.append("")  # spacer
+        lines.append(burn_line)
 
         console.print()
         console.print(Panel.fit(

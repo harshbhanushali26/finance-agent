@@ -6,14 +6,14 @@ execute()     — dispatches tool call to correct handler
 from tools.schemas import (
     AddTransaction, ViewTransactions, StageDelete, StageUpdate, 
     GetDailySummary, GetMonthlySummary, GetCategoryBreakdown, GetTopCategories, GetCategories,
-    SetBudget, GetBudgetStatus, CheckOverspend,
+    SetBudget, GetBudgetStatus, CheckOverspend, SuggestBudget,
     GetConfig, SetMonthlyIncome, SetPreference,
     pydantic_to_groq
 )
 
 from tools.transactions import (add_transaction, stage_delete, stage_update, view_transactions)
 from tools.analytics import (get_daily_summary, get_monthly_summary, get_category_breakdown, get_top_categories, get_categories)
-from tools.budget import (set_budget, get_budget_status, check_overspend)
+from tools.budget import (set_budget, get_budget_status, check_overspend, suggest_budget)
 from tools.settings import (get_config, set_monthly_income, set_preference)
 
 TOOL_REGISTRY = {
@@ -50,8 +50,8 @@ TOOL_REGISTRY = {
         "schema": pydantic_to_groq(GetTopCategories, "get_top_categories", "Get top N expense categories for a month by total amount"),
     },
     "get_categories": {
-    "handler": get_categories,
-    "schema": pydantic_to_groq(GetCategories, "get_categories", "Get all income and expense category names for this user"),
+        "handler": get_categories,
+        "schema": pydantic_to_groq(GetCategories, "get_categories", "Get all income and expense category names for this user"),
     },
     "set_budget": {
         "handler": set_budget,
@@ -64,6 +64,10 @@ TOOL_REGISTRY = {
     "check_overspend": {
         "handler": check_overspend,
         "schema": pydantic_to_groq(CheckOverspend, "check_overspend", "Check which categories exceeded or are near budget limit. Always pass month in YYYY-MM format."),
+    },
+    "suggest_budget": {
+        "handler": suggest_budget,
+        "schema": pydantic_to_groq(SuggestBudget, "suggest_budget", "Suggest monthly budget amounts based on last 3 months average spend per category"),
     },
     "get_config": {
         "handler": get_config,

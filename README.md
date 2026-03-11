@@ -198,6 +198,7 @@ All tools are defined as Pydantic models and executed through the bridge layer.
 | `get_budget_status`   | Current budget usage |
 | `get_config`          | User settings |
 | `set_monthly_income`  | Update monthly income |
+| `suggest_budget` | Suggest budgets based on last 3 months average |
 
 ## Delete / Update Flow
 
@@ -222,16 +223,20 @@ The system ensures safe operations without exposing IDs to the user:
 
 - Occasional malformed tool calls from the model (automatically retried)
 - Conversation history is in-memory only
-- `get_category_breakdown` covers all time (use monthly tools for filtered results)
 - Groq free tier limit applies (sufficient for normal usage)
 
 ## Roadmap
 
-- v1.1: Pattern matching for simple queries, reduced token usage
-- v1.2: Budget trend warnings and auto-suggestions
-- v1.3: Spending pattern detection and alerts
-- v1.4: Basic financial advice and what-if scenarios
-- v1.5: Financial health scoring
+- v1.1 ✅ Stability & Polish — retry on malformed calls, duplicate warnings, category suggestions
+- v1.2 ✅ Budget Intelligence — burn rate, trend detection, auto suggestions, carry-forward
+- v1.3: Pattern Matcher — regex router, query classifier, cache layer
+- v1.4: Pattern Detection — spending spikes, subscription creep, lifestyle inflation
+- v1.5: Advisory Layer — savings goals, what-if analysis, month-end review
+- v1.6: Financial Health Score
+- v2.0: FastAPI REST API + multi-user
+- v2.1: Web UI
+- v3.0: ML Intelligence
+
 
 ## Author
 

@@ -149,6 +149,10 @@ class CheckOverspend(BaseModel):
     month: str = Field(description="Month in YYYY-MM format e.g. 2026-02")
 
 
+class SuggestBudget(BaseModel):
+    pass
+
+
 # ── Settings Schemas ─────────────────────────────────────────────────────────────
 
 class GetConfig(BaseModel):
