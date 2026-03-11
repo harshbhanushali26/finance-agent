@@ -64,7 +64,7 @@ class Session:
             self.history = [self.history[0]]
         else:
             self.history = []
-
+        self.state.clear()
 
     def add_system_prompt(self, filepath: Path = SYSTEM_PROMPT_FILEPATH):
         """Read system prompt from markdown file, inject dynamic values, add to history.

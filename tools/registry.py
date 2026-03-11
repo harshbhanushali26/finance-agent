@@ -43,7 +43,7 @@ TOOL_REGISTRY = {
     },
     "get_category_breakdown": {
         "handler": get_category_breakdown,
-        "schema": pydantic_to_groq(GetCategoryBreakdown, "get_category_breakdown", "Get total amount per category for income or expense"),
+        "schema": pydantic_to_groq(GetCategoryBreakdown, "get_category_breakdown", "Get total amount per category. Required: type (income or expense) and month (YYYY-MM). Do not ask follow-up — default to expense if not specified."),
     },
     "get_top_categories": {
         "handler": get_top_categories,

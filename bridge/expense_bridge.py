@@ -6,6 +6,7 @@ outside this file.
 
 import sys
 from pathlib import Path
+from datetime import datetime
 
 # To get path of expense-tracker folder (root)
 EXPENSE_TRACKER_PATH = Path(__file__).parent.parent.parent / "expense-tracker"
@@ -53,9 +54,32 @@ class ExpenseBridge:
         self.user_id = user_id
 
 
+    # ── Helper Functions ────────────────────────────────────────────────────────
+
+    def _is_duplicate(self, type_: str, amount: float, category: str, date: str) -> bool:
+        """Check if same type+amount+category was added on the same date already."""
+        existing = self.filter_txn(type=type_, date=date)
+        for txn in existing.values():
+            if txn.category == category and txn.amount == amount:
+                return True
+        return False
+
+    def suggest_category(self, type_: str, name: str) -> list[str]:
+        """Return existing categories similar to the given name."""
+        name = name.strip().lower()
+        cats = (
+            self.category_manager.get_income_categories()
+            if type_ == "income"
+            else self.category_manager.get_expense_categories()
+        )
+        matches = [c for c in cats if name in c.lower() or c.lower() in name]
+        return matches[:3]
+
+
+
     # ── CRUD Operations ────────────────────────────────────────────────────────
 
-    def add_txn(self, type_: str, amount: float, category: str, date: str, description: str = None) -> bool:
+    def add_txn(self, type_: str, amount: float, category: str, date: str, description: str = None) -> dict:
         """Add a new transaction. Auto-creates category if it doesn't exist.
         
         Args:
@@ -66,8 +90,17 @@ class ExpenseBridge:
             description: Optional description
             
         Returns:
-            True if added successfully, False otherwise
+            Dict with success bool and optional warning/error string
         """
+        # validate amount
+        if amount <= 0:
+            return {"success": False, "error": f"Amount must be greater than 0, got {amount}"}
+
+        # validate date
+        try:
+            datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            return {"success": False, "error": f"Invalid date format '{date}' — use YYYY-MM-DD"}
 
         category = category.strip().title()
         valid_categories = (
@@ -76,14 +109,30 @@ class ExpenseBridge:
             else self.category_manager.get_expense_categories()
         )
 
+        warning = None
+
         if category not in valid_categories:
+            suggestions = self.suggest_category(type_, category)
             self.category_manager.add_category(type_, category)
+            if suggestions:
+                warning = f"Created new category '{category}'. Similar existing: {suggestions}. Was this intended?"
+            else:
+                warning = f"Created new category '{category}'."
+
+        # duplicate check — warn but still add
+        if self._is_duplicate(type_, amount, category, date):
+            warning = f"Possible duplicate — {type_} of ₹{amount} for {category} on {date} already exists. Added anyway."
 
         txn = Transaction(type_, amount, category, date, description=description)
-        return self.manager.add_transaction(txn)
+        result = self.manager.add_transaction(txn)
+
+        if not result:
+            return {"success": False, "error": "Failed to save transaction"}
+
+        return {"success": True, "warning": warning}
 
 
-    def update_txn(self, txn_id: str, fields: dict) -> bool:
+    def update_txn(self, txn_id: str, fields: dict) -> dict:
         """Update specific fields of an existing transaction.
         
         Args:
@@ -91,21 +140,27 @@ class ExpenseBridge:
             fields: Dict of only the fields to change e.g. {"amount": 300}
             
         Returns:
-            True if updated, False if txn_id not found
+            dict -> True if success, else False and error
         """
-        return self.manager.update_transaction(txn_id, fields)
+        result = self.manager.update_transaction(txn_id, fields)
+        if result:
+            return {"success": True}
+        return {"success": False, "error": f"Transaction '{txn_id}' not found"}
 
 
-    def delete_txn(self, txn_id: str) -> bool:
+    def delete_txn(self, txn_id: str) -> dict:
         """Delete a transaction by ID.
         
         Args:
             txn_id: Transaction UUID
             
         Returns:
-            True if deleted, False if txn_id not found
+            dict -> True if success, else False and error 
         """
-        return self.manager.delete_transaction(txn_id)
+        result = self.manager.delete_transaction(txn_id)
+        if result:
+            return {"success": True}
+        return {"success": False, "error": f"Transaction '{txn_id}' not found"}
 
 
     def filter_txn(self, **kwargs) -> dict:
@@ -175,7 +230,7 @@ class ExpenseBridge:
         return self.manager.get_daily_summary(date)
 
 
-    def get_category_breakdown(self, type_: str) -> dict:
+    def get_category_breakdown(self, type_: str, month: str = None) -> dict:
         """Get total amount spent per category for a transaction type.
         
         Args:
@@ -184,6 +239,13 @@ class ExpenseBridge:
         Returns:
             Dict of {category: total_amount}
         """
+        if month:
+            txns = self.filter_txn(type=type_, month=month)
+            breakdown = {}
+            for txn in txns.values():
+                cat = txn.category
+                breakdown[cat] = breakdown.get(cat, 0) + txn.amount
+            return breakdown
         return self.manager.get_category_breakdown(type_)
 
 

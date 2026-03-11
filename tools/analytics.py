@@ -47,13 +47,21 @@ def get_monthly_summary(args: dict, session) -> str:
 def get_category_breakdown(args: dict, session) -> str:
     """Handle get_category_breakdown tool call."""
     try:
-        breakdown = session.bridge.get_category_breakdown(args["type_"])
+        month = args.get("month")
+        txn_type = args.get("type") or args.get("type_")
+
+        if not txn_type:
+            return "Transaction type (income/expense) is required"
+
+        breakdown = session.bridge.get_category_breakdown(txn_type, month)
 
         if not breakdown:
-            return f"No {args['type_']} transactions found"
+            month_str = f" for {month}" if month else ""
+            return f"No {txn_type} transactions found{month_str}"
 
         lines = [f"{category}: ₹{amount}" for category, amount in breakdown.items()]
-        return f"{args['type_'].capitalize()} breakdown — " + ", ".join(lines)
+        month_str = f" for {month}" if month else " (all time)"
+        return f"{txn_type.capitalize()} breakdown{month_str} — " + ", ".join(lines)
 
     except Exception as e:
         return f"Error getting category breakdown: {str(e)}"

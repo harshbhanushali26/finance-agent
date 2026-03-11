@@ -57,6 +57,12 @@ def pydantic_to_groq(model: type[BaseModel], name: str, description: str) -> dic
         for field, prop in raw.get("properties", {}).items()
     }
 
+    # rename type_ → type so model always sends "type"
+    if "type_" in cleaned_properties:
+        cleaned_properties["type"] = cleaned_properties.pop("type_")
+
+    required = [r.replace("type_", "type") for r in raw.get("required", [])]
+
     return {
         "type": "function",
         "function": {
@@ -65,7 +71,7 @@ def pydantic_to_groq(model: type[BaseModel], name: str, description: str) -> dic
             "parameters": {
                 "type": "object",
                 "properties": cleaned_properties,
-                "required": raw.get("required", [])
+                "required": required
             }
         }
     }
@@ -114,7 +120,8 @@ class GetMonthlySummary(BaseModel):
 
 
 class GetCategoryBreakdown(BaseModel):
-    type_: Literal["income", "expense"] = Field(description="Transaction type to break down")
+    type_: Literal["income", "expense"] = Field(description="Transaction type — must be 'income' or 'expense'. Use 'expense' if not specified by user.")
+    month: Optional[str] = Field(default=None, description="Month YYYY-MM, defaults to current month")
 
 
 class GetTopCategories(BaseModel):

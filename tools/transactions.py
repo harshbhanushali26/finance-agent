@@ -18,21 +18,29 @@ def add_transaction(args: dict, session) -> str:
         Result string sent back to LLM
     """
     try:
-        success = session.bridge.add_txn(
-            type_=args["type_"],
+        txn_type = args.get("type") or args.get("type_")
+        if not txn_type:
+            return "Failed to add transaction — transaction type (income/expense) is required"
+
+        result = session.bridge.add_txn(
+            type_=txn_type,
             amount=float(args["amount"]),
             category=args["category"],
             date=args["date"],
             description=args.get("description")
         )
 
-        if success:
-            return f"Transaction added successfully — {args['type_']} of {args['amount']} for {args['category']} on {args['date']}"
-        else:
-            return "Failed to add transaction — it may already exist"
+        if not result["success"]:
+            return f"Failed to add transaction — {result.get('error', 'unknown error')}"
+
+        if result.get("warning"):
+            return f"⚠️ WARNING: {result['warning']} Transaction was added — {txn_type} of ₹{args['amount']} for {args['category']} on {args['date']}. You MUST inform the user about the possible duplicate."
+
+        return f"Transaction added — {txn_type} of ₹{args['amount']} for {args['category']} on {args['date']}"
 
     except Exception as e:
         return f"Error adding transaction: {str(e)}"
+
 
 
 def update_transaction(args: dict, session) -> str:
@@ -58,13 +66,11 @@ def update_transaction(args: dict, session) -> str:
         if not fields:
             return "No fields provided to update"
 
-        success = session.bridge.update_txn(txn_id, fields)
-
-        if success:
+        result = session.bridge.update_txn(txn_id, fields)
+        if result["success"]:
             updated = ", ".join(f"{k}: {v}" for k, v in fields.items())
             return f"Transaction {txn_id} updated successfully — changed {updated}"
-        else:
-            return f"Transaction {txn_id} not found"
+        return f"Failed to update — {result.get('error', 'unknown error')}"
 
     except Exception as e:
         return f"Error updating transaction: {str(e)}"
@@ -82,12 +88,11 @@ def delete_transaction(args: dict, session) -> str:
     """
     try:
         txn_id = args["txn_id"]
-        success = session.bridge.delete_txn(txn_id)
+        result = session.bridge.delete_txn(txn_id)
 
-        if success:
+        if result["success"]:
             return f"Transaction {txn_id} deleted successfully"
-        else:
-            return f"Transaction {txn_id} not found"
+        return f"Failed to delete — {result.get('error', 'unknown error')}"
 
     except Exception as e:
         return f"Error deleting transaction: {str(e)}"
@@ -102,7 +107,17 @@ def view_transactions(args: dict, session) -> str:
 
         transactions = session.bridge.filter_txn(**filters)
         if not transactions:
-            return "No transactions found matching the given filters"
+            parts = []
+            if "type" in filters:
+                parts.append(filters["type"])
+            if "category" in filters:
+                parts.append(f"category '{filters['category']}'")
+            if "month" in filters:
+                parts.append(f"month {filters['month']}")
+            if "date" in filters:
+                parts.append(f"date {filters['date']}")
+            filter_desc = " · ".join(parts) if parts else "given filters"
+            return f"No transactions found for {filter_desc}"
 
         # store in dependency state — step 1 of delete/update flow
         step_id = session.state.next_step()

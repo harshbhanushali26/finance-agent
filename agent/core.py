@@ -13,8 +13,8 @@ from tools import registry
 load_dotenv()
 
 MAX_TOOL_CALLS = 5
-MODEL = "openai/gpt-oss-120b"  # for development
-# MODEL = "llama-3.3-70b-versatile"  # for production
+# MODEL = "openai/gpt-oss-120b"  # for development
+MODEL = "openai/gpt-oss-20b"  # for production
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
@@ -37,7 +37,6 @@ def run(user_message: str, session) -> str:
 
     if session.message_count > 20:
         session.clear_history()
-        session.add_message("system", "History cleared to save context. Continue normally.")
 
     session.add_message("user", user_message)
 
@@ -57,32 +56,42 @@ def run(user_message: str, session) -> str:
         except BadRequestError as e:
             error_str = str(e)
             if "tool_use_failed" in error_str:
-                # silent retry once — clears model confusion
                 try:
-                    response = client.chat.completions.create(
-                        model=MODEL,
-                        messages=session.get_history(),
-                        tools=registry.get_schemas(),
-                        tool_choice="auto",
-                        parallel_tool_calls=False
-                    )
-                    message = response.choices[0].message
-                    if not message.tool_calls:
-                        final_response = message.content or "Done."
-                        session.add_message("assistant", final_response)
-                        return final_response
-                    session.add_assistant_message(message)
-                    for tool_call in message.tool_calls:
+                    import re
+                    match = re.search(r"'failed_generation': '(\{.+?\})'", error_str)
+                    if match:
+                        failed = json.loads(match.group(1))
+                        tool_name = failed["name"]
+                        args = failed["arguments"]
+
+                        # normalize type_ → type
+                        if "type_" in args:
+                            args["type"] = args.pop("type_")
+
+                        result = registry.execute(tool_name, args, session)
+
+                        fake_id = f"recovered_{tool_call_count}"
+                        session.history.append({
+                            "role": "assistant",
+                            "content": "",
+                            "tool_calls": [{
+                                "id": fake_id,
+                                "type": "function",
+                                "function": {
+                                    "name": tool_name,
+                                    "arguments": json.dumps(args)
+                                }
+                            }]
+                        })
+                        session.add_tool_result(fake_id, tool_name, result)
                         tool_call_count += 1
-                        try:
-                            args = json.loads(tool_call.function.arguments)
-                            result = registry.execute(tool_call.function.name, args, session)
-                        except Exception as ex:
-                            result = f"Tool failed: {str(ex)}"
-                        session.add_tool_result(tool_call.id, tool_call.function.name, result)
-                    continue  # go back to top of while loop for final response
+                        continue
+
                 except Exception:
-                    return "I had trouble with that — could you try saying 'yes delete it' or 'confirm delete'?"
+                    import traceback
+                    traceback.print_exc()
+
+                return "I had trouble with that — could you try rephrasing?"
             return f"Request failed: {error_str}"
 
         message = response.choices[0].message

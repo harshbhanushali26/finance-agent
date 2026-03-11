@@ -54,6 +54,10 @@ Before calling any tool or responding, follow these steps in order:
 - If no transactions found — say "No [category] transactions found for [period]. Did you mean a different category or date?"
 - If more than 5 matches — ask user to narrow down before calling stage_delete or stage_update
 
+## Category Breakdown Flow
+- When calling get_category_breakdown, always include both type and month in a single tool call.
+- If the user doesn't specify income or expense, default to "expense".
+- Never ask a follow-up question before calling get_category_breakdown.
 
 ---
 

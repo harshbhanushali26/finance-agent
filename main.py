@@ -344,13 +344,21 @@ def _execute_pending(session: Session):
 
     try:
         if action["action_type"] == "delete":
-            success = session.bridge.delete_txn(action["txn_id"])
-            msg = f"Deleted — {action['description']}." if success else "Transaction not found."
+            result = session.bridge.delete_txn(action["txn_id"])
+            msg = (
+                f"Deleted — {action['description']}."
+                if result["success"]
+                else f"Failed — {result.get('error', 'transaction not found')}"
+            )
 
         elif action["action_type"] == "update":
-            success = session.bridge.update_txn(action["txn_id"], action["fields"])
+            result = session.bridge.update_txn(action["txn_id"], action["fields"])
             changes = ", ".join(f"{k} → {v}" for k, v in action["fields"].items())
-            msg = f"Updated — {action['description']}. Changed {changes}." if success else "Transaction not found."
+            msg = (
+                f"Updated — {action['description']}. Changed {changes}."
+                if result["success"]
+                else f"Failed — {result.get('error', 'transaction not found')}"
+            )
 
         console.print()
         console.print("[bold green]Agent:[/bold green] ", end="")
@@ -386,7 +394,6 @@ def chat_loop(session: Session):
             if not user_input:
                 continue
 
-
             # ── AWAIT_SELECT — user picking number ────────────────
             if session.state.mode == "await_select":
                 if user_input.strip().isdigit():
@@ -403,6 +410,8 @@ def chat_loop(session: Session):
                         console.print()
                     else:
                         agent_error("Invalid number — pick from the list above.")
+                elif handle_command(user_input.lower(), session):
+                        pass
                 else:
                     # user said something else — cancel state, send to LLM
                     session.state.reset()
@@ -424,6 +433,8 @@ def chat_loop(session: Session):
                     console.print("[bold green]Agent:[/bold green] ", end="")
                     type_out("Cancelled — nothing changed.", color="white")
                     console.print()
+                elif handle_command(user_input.lower(), session):
+                        pass
                 else:
                     console.print()
                     console.print("[bold green]Agent:[/bold green] ", end="")
@@ -431,8 +442,7 @@ def chat_loop(session: Session):
                     console.print()
                 continue
 
-
-            # ── IDLE — normal flow ────────────────────────────────
+            # ── IDLE ──────────────────────────────────────────────
             if handle_command(user_input.lower(), session):
                 continue
 
