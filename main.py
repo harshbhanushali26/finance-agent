@@ -16,9 +16,10 @@ from datetime import datetime, timedelta
 
 from agent import core
 from agent.session import Session
-from tools.budget import _carry_forward_budgets
 from bridge.auth_helper import login
 from bridge.expense_bridge import ExpenseBridge
+from tools.budget import _carry_forward_budgets
+from agent.pattern_matcher import match as pm_match
 from agent.cli import (
     agent_success, agent_info,
     agent_error, agent_status, agent_thinking,
@@ -504,6 +505,16 @@ def chat_loop(session: Session):
 
             # ── IDLE ──────────────────────────────────────────────
             if handle_command(user_input.lower(), session):
+                continue
+
+            # Pattern matcher — try before LLM
+            result = pm_match(user_input, session)
+            if result["matched"]:
+                console.print()
+                console.print("[bold green]Agent:[/bold green] ", end="")
+                type_out(result["response"], color="white")
+                console.print()
+                console.print()
                 continue
 
             # send to LLM

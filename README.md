@@ -2,7 +2,7 @@
 
 A Python-based conversational AI assistant that extends the [expense-tracker](https://github.com/harshbhanushali26/expense-tracker) CLI. The agent interprets natural language input, selects and executes appropriate tools, and manages state across multi-step operations such as confirmation flows.
 
-Built without external agent frameworks. It uses direct LLM tool calling, a bridge layer for data access, and a lightweight state machine for reliable user interactions. All operations run in a terminal interface powered by Rich.
+Built without external agent frameworks. It uses direct LLM tool calling, a bridge layer for data access, a pattern matcher for common queries, and a lightweight state machine for reliable user interactions. All operations run in a terminal interface powered by Rich.
 
 ## Demo
 
@@ -26,6 +26,12 @@ Agent: Delete ₹250 Food on Feb 28? Say yes to confirm.
 
 You: yes
 Agent: Deleted — ₹250 Food on Feb 28.
+
+You: show this month
+Agent: March 2026 — Income: ₹50,000 | Expenses: ₹4,797 | Balance: ₹45,203 | 21 transaction(s)
+
+You: balance
+Agent: March 2026 — Income: ₹50,000 | Expenses: ₹4,797 | Balance: ₹45,203
 
 You: dashboard
 ───── 📅 Today — 01 Mar 2026 ─────
@@ -57,6 +63,12 @@ User Input
    ├── Special Commands (dashboard, budget, categories)
    │     └── bridge.get_*() → JSON files (no LLM calls)
    │
+   ├── Pattern Matcher (v1.3)
+   │          ├── Add queries  — "add 250 food" → bridge.add_txn() directly
+   │          ├── View queries — "show this month" → bridge.get_monthly_summary()
+   │          └── Balance      — "my balance" → bridge.get_monthly_summary()
+   │                 (no LLM calls — ~60% of common queries bypassed)
+   │
    └── Normal Query
          │
          ▼
@@ -74,6 +86,7 @@ User Input
 
 | Decision                          | Reason |
 |-----------------------------------|--------|
+| Pattern Matcher (`pattern_matcher.py`) | Bypasses LLM for ~60% of common queries — zero tokens, instant response |
 | Bridge pattern (`expense_bridge.py`) | Keeps the original expense-tracker untouched and independent |
 | DependencyState                   | Persists tool results across steps for safe delete/update flows |
 | State machine in `main.py`        | Handles number selection and yes/no confirmation without LLM calls |
@@ -142,6 +155,12 @@ cd finance-agent
 python main.py
 ```
 
+### Run Tests
+```bash
+python test_pattern_matcher.py
+```
+
+
 ## Available Commands
 
 | Command      | Description                          | LLM calls |
@@ -153,6 +172,21 @@ python main.py
 | `history`    | Show conversation history            | 0         |
 | `clear`      | Reset conversation history           | 0         |
 | `exit`       | Exit the application                 | 0         |
+
+## Pattern Matcher — Zero LLM Queries
+
+Simple queries are intercepted before reaching the LLM:
+
+| Pattern | Example | LLM calls |
+|---|---|---|
+| Add expense | `add 250 food`, `spent 2.5k transport` | 0 |
+| Add income | `got 50000 salary`, `received 5000 bonus` | 0 |
+| View month | `show this month`, `list january`, `last month` | 0 |
+| View day | `show today`, `show yesterday` | 0 |
+| Balance | `balance`, `my balance`, `how much left` | 0 |
+
+Multi-word categories (`Electricity Bill`), ambiguous dates (`last tuesday`, `last week`), and conversational queries always fall through to the LLM.
+
 
 ## Example Queries
 
@@ -219,7 +253,7 @@ The system ensures safe operations without exposing IDs to the user:
 - **Data**: JSON files (shared with expense-tracker)
 - **Package manager**: uv
 
-## Known Limitations (v1)
+## Known Limitations
 
 - Occasional malformed tool calls from the model (automatically retried)
 - Conversation history is in-memory only
@@ -230,6 +264,11 @@ The system ensures safe operations without exposing IDs to the user:
 - v1.1 ✅ Stability & Polish — retry on malformed calls, duplicate warnings, category suggestions
 - v1.2 ✅ Budget Intelligence — burn rate, trend detection, auto suggestions, carry-forward
 - v1.3: Pattern Matcher — regex router, query classifier, cache layer
+
+       ✅ regex router
+       query classifier
+       cache layer
+
 - v1.4: Pattern Detection — spending spikes, subscription creep, lifestyle inflation
 - v1.5: Advisory Layer — savings goals, what-if analysis, month-end review
 - v1.6: Financial Health Score
