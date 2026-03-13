@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import date, timedelta
 
 # ── Path setup ─────────────────────────────────────────────────────────────────
-sys.path.append(str(Path(__file__).parent))
+sys.path.append(str(Path(__file__).parent.parent))
 
 from agent.pattern_matcher import match
 
@@ -21,6 +21,11 @@ class MockBridge:
     """Minimal bridge mock — returns realistic responses without touching files."""
 
     def add_txn(self, type_, amount, category, date, description=None):
+        self.last_add_args = {
+            "type_": type_, "amount": amount,
+            "category": category, "date": date,
+            "description": description
+        }
         return {"success": True, "warning": None}
 
     def get_monthly_summary(self, month):
@@ -34,10 +39,11 @@ class MockBridge:
     def get_category_breakdown(self, type_, month=None):
         return {"Food": 1200, "Transport": 500, "Salary": 50000}
 
+mock_bridge = MockBridge()
 
 class MockSession:
     user_id = "u001"
-    bridge  = MockBridge()
+    bridge  = mock_bridge
 
 
 session = MockSession()
@@ -82,6 +88,21 @@ def run(label: str, message: str, expect_matched: bool, expect_in: str = None):
     passed += 1
 
 
+def run_desc(label: str, message: str, expect_desc):
+    global passed, failed
+    match(message, session)
+    got = mock_bridge.last_add_args.get("description")
+    if got != expect_desc:
+        print(f"  FAIL  {label}")
+        print(f"        input:       '{message}'")
+        print(f"        expect_desc: {expect_desc!r}")
+        print(f"        got_desc:    {got!r}")
+        failed += 1
+    else:
+        print(f"  PASS  {label}")
+        passed += 1
+
+
 # ── Test cases ─────────────────────────────────────────────────────────────────
 
 def test_add_expense():
@@ -92,6 +113,17 @@ def test_add_expense():
     run("bought + category",                "bought 150 groceries",      True,  "Groceries")
     run("add + 2.5k amount",               "add 2.5k electricity",      True,  "Electricity")
     run("add + comma amount",              "add 2,500 medicine",        True,  "Medicine")
+
+
+def test_add_description():
+    print("\n── Add — description via 'note' keyword ─────────────")
+    run_desc("note + multi word desc",      "add 250 others note newspaper bill",      "newspaper bill")
+    run_desc("note + multi word desc",      "add 500 food note lunch with team",       "lunch with team")
+    run_desc("spent + note keyword",        "spent 300 transport note uber ride",      "uber ride")
+    run_desc("paid + note keyword",         "paid 1200 rent note monthly rent",        "monthly rent")
+    run_desc("note + single word",          "add 100 food note coffee",                "coffee")
+    run_desc("notebook edge case",          "add 250 notebook",                        None)
+    run_desc("no note keyword",             "add 250 food",                            None)
 
 
 def test_add_income():
@@ -186,6 +218,7 @@ if __name__ == "__main__":
     test_view_fallthrough()
     test_balance()
     test_llm_only()
+    test_add_description()
 
     print()
     print("=" * 56)

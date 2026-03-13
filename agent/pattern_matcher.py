@@ -255,27 +255,37 @@ def _is_add_query(normalized: str) -> bool:
 
 def _handle_add(original: str, normalized: str, session) -> dict:
     try:
+        description    = None
+        original_clean = original
+        normalized_clean = normalized
+
+        if " note " in normalized:
+            parts            = normalized.split(" note ", 1)
+            normalized_clean = parts[0].strip()
+            description      = parts[1].strip()
+            original_clean   = original[:original.lower().index(" note ")].strip()
+        
         # 1. Type — from normalized (trigger word is always lowercase)
-        type_ = _extract_type(normalized)
+        type_ = _extract_type(normalized_clean)
         if type_ is None:
             if DEBUG: print("[PM] ✗ add — could not extract type")
             return {"matched": False}
 
         # 2. Amount — from normalized (digits are case-insensitive)
-        amount = _extract_amount(normalized)
+        amount = _extract_amount(normalized_clean)
         if amount is None:
             if DEBUG: print("[PM] ✗ add — could not extract amount")
             return {"matched": False}
 
         # 3. Category — from original to preserve casing
-        category = _extract_category(original)
+        category = _extract_category(original_clean)
         if category is None:
             if DEBUG: print("[PM] ✗ add — could not extract category")
             return {"matched": False}
         if DEBUG: print(f"[PM DEBUG] extracted category: '{category}'")
 
         # 4. Date — from normalized
-        txn_date = _extract_date(normalized)
+        txn_date = _extract_date(normalized_clean)
         if txn_date is None:
             if DEBUG: print("[PM] ✗ add — could not extract date (ambiguous)")
             return {"matched": False}
@@ -286,6 +296,7 @@ def _handle_add(original: str, normalized: str, session) -> dict:
             amount=amount,
             category=category,
             date=txn_date,
+            description=description
         )
 
         if not result.get("success"):
