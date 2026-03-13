@@ -26,6 +26,8 @@ from agent.cli import (
     type_list, type_out, console
 )
 
+DEBUG = False
+
 MAX_LOGIN_RETRIES = 3
 
 COMMANDS = {
@@ -213,24 +215,42 @@ def show_budget(session: Session):
                     exceed_date = (today + timedelta(days=days_to_exceed)).strftime("%d %b")
                     lines.append(f"  [dim]↑ At this rate, {category} exceeded by {exceed_date}[/dim]")
 
+            lines.append("")
 
-        # ── Burn Rate ──────────────────────────────────────────────
-        total_budget = sum(budgets.values())
-        total_spent = sum(breakdown.get(cat, 0) for cat in budgets)
 
-        daily_actual = total_spent / days_passed if days_passed > 0 else 0
-        daily_allowed = total_budget / days_in_month
+        # ── Per-category Burn Rate ─────────────────────────────────
+        lines.append("[dim]── Burn Rate ─────────────────────────────────────────[/dim]")
 
-        burn_line = (
-            f"[dim]Burn rate[/dim]  "
-            f"[yellow]₹{daily_actual:,.0f}/day[/yellow] actual  "
-            f"[dim]vs[/dim]  "
-            f"[green]₹{daily_allowed:,.0f}/day[/green] allowed  "
-            f"[dim]· {days_remaining} days left[/dim]"
+        for category, limit in budgets.items():
+            spent = breakdown.get(category, 0)
+            daily_actual  = spent / days_passed if days_passed > 0 else 0
+            daily_allowed = limit / days_in_month
+
+            if daily_actual > daily_allowed:
+                rate_color = "red"
+            elif daily_actual > daily_allowed * 0.8:
+                rate_color = "yellow"
+            else:
+                rate_color = "green"
+
+            lines.append(
+                f"  [bold]{category:<12}[/bold] "
+                f"[{rate_color}]₹{daily_actual:,.0f}/day[/{rate_color}] actual  "
+                f"[dim]vs  ₹{daily_allowed:,.0f}/day allowed[/dim]"
+            )
+
+        # ── Overall total line ─────────────────────────────────────
+        total_spent_all  = sum(breakdown.values())   # all expense categories
+        total_budget_all = sum(budgets.values())
+        daily_actual_total  = total_spent_all / days_passed if days_passed > 0 else 0
+        daily_allowed_total = total_budget_all / days_in_month
+
+        lines.append("")
+        lines.append(
+            f"  [bold]{'Total':<12}[/bold] "
+            f"[yellow]₹{daily_actual_total:,.0f}/day[/yellow] actual  "
+            f"[dim]vs  ₹{daily_allowed_total:,.0f}/day allowed  · {days_remaining} days left[/dim]"
         )
-
-        lines.append("")  # spacer
-        lines.append(burn_line)
 
         console.print()
         console.print(Panel.fit(
@@ -326,6 +346,7 @@ def handle_login() -> tuple[str, str]:
 
         agent_status("Verifying credentials")
         user_id = login(username, password)
+        console.print()
 
         if user_id:
             agent_success(f"Welcome back, {username}!")
@@ -447,9 +468,11 @@ def chat_loop(session: Session):
     ))
     console.print()
 
+    if DEBUG: print(f"[STATE] mode: {session.state.mode}")
     while True:
         try:
             user_input = Prompt.ask("[bold cyan]You[/bold cyan]").strip()
+            if DEBUG: print(f"[STATE] mode={session.state.mode} input={user_input!r}")
             console.print()
 
             if not user_input:
@@ -482,6 +505,11 @@ def chat_loop(session: Session):
                     console.print("[bold green]Agent:[/bold green] ", end="")
                     type_out(response, color="white")
                     console.print()
+                    # if state is still idle after LLM — previous delete flow was cancelled
+                    if session.state.mode == "idle":
+                        console.print()
+                        console.print("[dim]Previous selection cancelled. Start a new request.[/dim]")
+                        console.print()
                 continue
 
             # ── AWAIT_CONFIRM — user saying yes/no ────────────────

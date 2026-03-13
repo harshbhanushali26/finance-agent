@@ -6,15 +6,18 @@ Supports multiple tool calls per turn with a max limit to prevent infinite loops
 
 import os
 import json
-from groq import Groq, BadRequestError
-from dotenv import load_dotenv
 from tools import registry
+from dotenv import load_dotenv
+from groq import Groq, BadRequestError
+from agent.classifier import classify_intent
 
 load_dotenv()
 
 MAX_TOOL_CALLS = 5
-# MODEL = "openai/gpt-oss-120b"  # for development
-MODEL = "openai/gpt-oss-20b"  # for production
+# MODEL = "openai/gpt-oss-120b"  
+MODEL = "openai/gpt-oss-20b"    
+
+DEBUG = False  # set False in production
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
@@ -40,6 +43,15 @@ def run(user_message: str, session) -> str:
 
     session.add_message("user", user_message)
 
+    # ── Phase B — classify intent, filter tools ────────────────────────────────
+    intent = classify_intent(user_message)
+    tools  = registry.get_tools_for_intent(intent)
+    if DEBUG: print(f"[CL] intent: {intent} | tools: {len(tools)}/15")
+
+    # fresh delete/update flow — clear stale step storage
+    if intent in ("delete", "update"):
+        session.state.reset_steps()
+
     tool_call_count = 0
     errors = []
 
@@ -49,7 +61,7 @@ def run(user_message: str, session) -> str:
             response = client.chat.completions.create(
                 model=MODEL,
                 messages=session.get_history(),
-                tools=registry.get_schemas(),
+                tools=tools,
                 tool_choice="none" if tool_call_count > 0 else "auto",
                 parallel_tool_calls=False
             )
@@ -100,6 +112,12 @@ def run(user_message: str, session) -> str:
         if not message.tool_calls:
             final_response = message.content or "I couldn't generate a response."
             session.add_message("assistant", final_response)
+
+            # auto-clear after response — never during active delete/update flow
+            if session.message_count > 20 and session.state.mode == "idle":
+                session.clear_history()
+                session.add_system_prompt()
+
             return final_response
 
         # append assistant message with tool calls to history
@@ -133,6 +151,12 @@ def run(user_message: str, session) -> str:
                 final_response = "I've completed the operations but couldn't generate a summary."
 
             session.add_message("assistant", final_response)
+
+            # auto-clear after response — never during active delete/update flow
+            if session.message_count > 20 and session.state.mode == "idle":
+                session.clear_history()
+                session.add_system_prompt()
+
             return final_response
 
 

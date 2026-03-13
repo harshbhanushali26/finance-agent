@@ -155,13 +155,21 @@ def stage_delete(args: dict, session) -> str:
         # resolve candidates from last stored step
         latest_step = session.state._step_counter
         if not session.state.has_step(latest_step):
-            return "No transactions found to delete — please search first"
+            return "No transactions staged. Please call view_transactions first."
 
         step_output = session.state.get_step_output(latest_step)
         candidates = step_output["data"]["transactions"]
 
+        if not candidates:                          
+            return "No matching transactions found."
+
         session.state.set_candidates(candidates, action_type="delete")
-        return "STAGED_DELETE — user selecting from list"
+        # build numbered list for LLM to show
+        lines = []
+        for i, c in enumerate(candidates, 1):
+            lines.append(f"{i}. {c['description']}")
+        list_str = "\n".join(lines)
+        return f"Staged for deletion. Show this list to user exactly:\n{list_str}\nAsk user to reply with a number."
 
     except Exception as e:
         return f"Error staging delete: {str(e)}"
@@ -172,10 +180,13 @@ def stage_update(args: dict, session) -> str:
     try:
         latest_step = session.state._step_counter
         if not session.state.has_step(latest_step):
-            return "No transactions found to update — please search first"
+            return "No transactions staged. Please call view_transactions first."
 
         step_output = session.state.get_step_output(latest_step)
         candidates = step_output["data"]["transactions"]
+
+        if not candidates:
+            return "No matching transactions found."
 
         # attach update fields to each candidate
         update_fields = {k: v for k, v in args.items() if k != "step_id" and v is not None}
@@ -183,7 +194,11 @@ def stage_update(args: dict, session) -> str:
             c["fields"] = update_fields
 
         session.state.set_candidates(candidates, action_type="update")
-        return "STAGED_UPDATE — user selecting from list"
+        lines = []
+        for i, c in enumerate(candidates, 1):
+            lines.append(f"{i}. {c['description']}")
+        list_str = "\n".join(lines)
+        return f"Staged for update. Show this list to user exactly:\n{list_str}\nAsk user to reply with a number."
 
     except Exception as e:
         return f"Error staging update: {str(e)}"

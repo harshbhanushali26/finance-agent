@@ -105,6 +105,10 @@ finance-agent/
 ├── tools/          # All tool handlers and schemas
 ├── prompts/        # System prompt
 ├── data/           # JSON files (symlinked)
+├── tests/
+│      ├── __init__.py
+│      ├── test_pattern_matcher.py
+|      └── test_classifier.py
 ├── main.py
 ├── .env
 └── pyproject.toml
@@ -157,7 +161,8 @@ python main.py
 
 ### Run Tests
 ```bash
-python test_pattern_matcher.py
+python tests/test_pattern_matcher.py
+python tests/test_classifier.py
 ```
 
 
@@ -226,12 +231,14 @@ All tools are defined as Pydantic models and executed through the bridge layer.
 | `stage_update`        | Prepare selected transactions for update |
 | `get_daily_summary`   | Summary for a specific date |
 | `get_monthly_summary` | Summary for a specific month |
-| `get_category_breakdown` | Total by category |
+| `get_category_breakdown` | Total by category | 
 | `get_top_categories`  | Top N categories by amount |
 | `set_budget`          | Set monthly budget limit |
 | `get_budget_status`   | Current budget usage |
+| `check_overspend`        | Detect categories exceeding budget this month |
 | `get_config`          | User settings |
 | `set_monthly_income`  | Update monthly income |
+| `set_preference`         | Update user preferences (currency, alerts) |
 | `suggest_budget` | Suggest budgets based on last 3 months average |
 
 ## Delete / Update Flow
@@ -258,17 +265,13 @@ The system ensures safe operations without exposing IDs to the user:
 - Occasional malformed tool calls from the model (automatically retried)
 - Conversation history is in-memory only
 - Groq free tier limit applies (sufficient for normal usage)
+- - Multi-word categories (e.g. "Electricity Bill") always route through the LLM — pattern matcher handles single-word categories only
 
 ## Roadmap
 
 - v1.1 ✅ Stability & Polish — retry on malformed calls, duplicate warnings, category suggestions
 - v1.2 ✅ Budget Intelligence — burn rate, trend detection, auto suggestions, carry-forward
-- v1.3: Pattern Matcher — regex router, query classifier, cache layer
-
-       ✅ regex router
-       query classifier
-       cache layer
-
+- v1.3 ✅ Pattern Matcher — regex router, query classifier
 - v1.4: Pattern Detection — spending spikes, subscription creep, lifestyle inflation
 - v1.5: Advisory Layer — savings goals, what-if analysis, month-end review
 - v1.6: Financial Health Score

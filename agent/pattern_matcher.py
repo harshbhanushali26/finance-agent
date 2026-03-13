@@ -46,6 +46,16 @@ DATE_WORDS = {
     "july", "august", "september", "october", "november", "december"
 }
 
+# Queries that need transaction listing — fall to LLM
+LIST_PHRASES = {
+    "all expenses", "all income", "all transactions",
+    "list all", "show all", "list food", "list rent",
+    "list utilities", "list transport", "list shopping",
+    "food transactions", "rent transactions"
+}
+
+CONFIG_PHRASES = {"config", "settings", "preference", "income setting", "currency setting"}
+
 ANALYTICS_KEYWORDS = {"top", "breakdown", "pattern", "analysis", "compare", "trend"}
 
 REJECTED_CATEGORY_WORDS = STOP_WORDS | DATE_WORDS | ALL_TRIGGERS
@@ -132,12 +142,21 @@ def _handle_balance(session) -> dict:
 
 
 def _is_view_query(normalized: str) -> bool:
+    if any(phrase in normalized for phrase in LIST_PHRASES):
+        return False
+
+    if any(word in normalized for word in CONFIG_PHRASES):
+        return False
+
     if any(word in normalized.split() for word in ANALYTICS_KEYWORDS):
         return False
+
     if any(normalized.startswith(t) for t in VIEW_TRIGGERS):
         return True
+
     if any(phrase in normalized for phrase in VIEW_PHRASES):
         return True
+
     if normalized in {"transactions", "my transactions", "this month", "last month"}:
         return True
     return False

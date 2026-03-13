@@ -108,3 +108,32 @@ def execute(tool_name: str, args: dict, session) -> str:
 
     handler = TOOL_REGISTRY[tool_name]["handler"]
     return handler(args, session)
+
+
+# ── Intent → tool name mapping ─────────────────────────────────────────────────
+
+INTENT_TOOLS = {
+    "delete":    ["view_transactions", "stage_delete"],
+    "update":    ["view_transactions", "stage_update"],
+    "add":       ["add_transaction", "get_categories"],
+    "view":      ["view_transactions", "get_daily_summary", "get_monthly_summary"],
+    "analytics": ["get_category_breakdown", "get_top_categories", "get_monthly_summary"],
+    "budget":    ["get_budget_status", "set_budget", "check_overspend", "suggest_budget"],
+    "settings":  ["get_config", "set_monthly_income", "set_preference"],
+}
+
+
+def get_tools_for_intent(intent: str) -> list:
+    """Return filtered tool schemas for a given intent.
+
+    Args:
+        intent: Intent string from classifier
+
+    Returns:
+        List of tool schemas to pass to Groq API.
+        Falls back to all schemas for unknown intent.
+    """
+    if intent not in INTENT_TOOLS:
+        return get_schemas()  # unknown → all 15
+    names = INTENT_TOOLS[intent]
+    return [TOOL_REGISTRY[name]["schema"] for name in names]

@@ -26,6 +26,13 @@ class DependencyState:
         self.pending_action: Optional[Dict] = None   # {action, txn_id, description, fields}
         self.candidates: List[Dict] = []  # [{txn_id, description, action_type, fields}]
 
+
+    def reset_steps(self):
+        """Clear step storage — call before starting a new delete/update flow."""
+        self._state.clear()
+        self._step_counter = 0
+
+
     # ── Step Storage ───────────────────────────────────────────────────────────
 
     def next_step(self) -> int:
