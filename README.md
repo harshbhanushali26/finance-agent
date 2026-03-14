@@ -68,6 +68,12 @@ User Input
    │          ├── View queries — "show this month" → bridge.get_monthly_summary()
    │          └── Balance      — "my balance" → bridge.get_monthly_summary()
    │                 (no LLM calls — ~60% of common queries bypassed)
+   |
+   ├── Insights Engine (v1.4)
+   │        └── run_all() — 6 detectors, 0 LLM calls
+   │               shown on login nudge + insights command
+   |
+   |
    │
    └── Normal Query
          │
@@ -108,6 +114,7 @@ finance-agent/
 ├── tests/
 │      ├── __init__.py
 │      ├── test_pattern_matcher.py
+|      ├── test_insights.py
 |      └── test_classifier.py
 ├── main.py
 ├── .env
@@ -163,6 +170,7 @@ python main.py
 ```bash
 python tests/test_pattern_matcher.py
 python tests/test_classifier.py
+python tests/test_insights.py
 ```
 
 
@@ -177,6 +185,8 @@ python tests/test_classifier.py
 | `history`    | Show conversation history            | 0         |
 | `clear`      | Reset conversation history           | 0         |
 | `exit`       | Exit the application                 | 0         |
+| `insights`   | Pattern detection                    | 0         |
+
 
 ## Pattern Matcher — Zero LLM Queries
 
@@ -189,6 +199,7 @@ Simple queries are intercepted before reaching the LLM:
 | View month | `show this month`, `list january`, `last month` | 0 |
 | View day | `show today`, `show yesterday` | 0 |
 | Balance | `balance`, `my balance`, `how much left` | 0 |
+| Add with description | `add 250 food note lunch with team` | 0 |
 
 Multi-word categories (`Electricity Bill`), ambiguous dates (`last tuesday`, `last week`), and conversational queries always fall through to the LLM.
 
@@ -265,14 +276,14 @@ The system ensures safe operations without exposing IDs to the user:
 - Occasional malformed tool calls from the model (automatically retried)
 - Conversation history is in-memory only
 - Groq free tier limit applies (sufficient for normal usage)
-- - Multi-word categories (e.g. "Electricity Bill") always route through the LLM — pattern matcher handles single-word categories only
+- Multi-word categories (e.g. "Electricity Bill") always route through the LLM — pattern matcher handles single-word categories only
 
 ## Roadmap
 
 - v1.1 ✅ Stability & Polish — retry on malformed calls, duplicate warnings, category suggestions
 - v1.2 ✅ Budget Intelligence — burn rate, trend detection, auto suggestions, carry-forward
 - v1.3 ✅ Pattern Matcher — regex router, query classifier
-- v1.4: Pattern Detection — spending spikes, subscription creep, lifestyle inflation
+- v1.4 ✅ Pattern Detection — spending spikes, subscription creep, lifestyle inflation
 - v1.5: Advisory Layer — savings goals, what-if analysis, month-end review
 - v1.6: Financial Health Score
 - v2.0: FastAPI REST API + multi-user

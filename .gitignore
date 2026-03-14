@@ -19,3 +19,4 @@ data/
 # Others
 dist/
 .uv/
+generate_dummy_data.py

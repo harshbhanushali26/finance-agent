@@ -6,6 +6,7 @@ Reads and writes data/budgets_u001.json directly — no ExpenseManager involved.
 import json
 from pathlib import Path
 from datetime import datetime
+from agent.utils import get_last_n_months
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 
@@ -115,24 +116,9 @@ def check_overspend(args: dict, session) -> str:
         return f"Error checking overspend: {str(e)}"
 
 
-def _get_last_n_months(n: int = 3) -> list[str]:
-    """Return last N month strings in YYYY-MM format."""
-    from datetime import datetime
-    today = datetime.now()
-    months = []
-    for i in range(1, n + 1):
-        month_num = today.month - i
-        year = today.year
-        while month_num <= 0:
-            month_num += 12
-            year -= 1
-        months.append(f"{year}-{month_num:02d}")
-    return months
-
-
 def _get_avg_spend(session, category: str, months: int = 3) -> float:
     """Get average monthly spend for a category over last N months."""
-    past_months = _get_last_n_months(months)
+    past_months = get_last_n_months(months)
     totals = []
     for month in past_months:
         breakdown = session.bridge.get_category_breakdown("expense", month)

@@ -289,6 +289,34 @@ def show_categories(session: Session):
         agent_error(f"Could not load categories: {str(e)}")
 
 
+def show_insights(session: Session):
+    """Display all pattern detection insights for current month. 0 LLM calls."""
+    from agent.insights import run_all
+
+    month = datetime.now().strftime("%Y-%m")
+    month_label = datetime.now().strftime("%B %Y")
+
+    insights = run_all(session.bridge, month)
+
+    console.print()
+    if not insights:
+        console.print(Panel.fit(
+            "[dim]No significant patterns detected this month yet.\n"
+            "Add more transactions to get insights.[/dim]",
+            title=f"[bold cyan]💡 Insights — {month_label}[/bold cyan]",
+            border_style="blue",
+            padding=(0, 2)
+        ))
+    else:
+        lines = [f"[white]{insight}[/white]" for insight in insights]
+        console.print(Panel.fit(
+            "\n".join(lines),
+            title=f"[bold cyan]💡 Insights — {month_label}[/bold cyan]",
+            border_style="blue",
+            padding=(0, 2)
+        ))
+    console.print()
+
 # ── Help ───────────────────────────────────────────────────────────────────────
 
 def print_help():
@@ -370,6 +398,7 @@ def handle_command(command: str, session: Session) -> bool:
     Returns:
         True if command was handled, False if should be sent to LLM
     """
+
     if command in ("exit", "quit", "bye"):
         agent_info(f"Goodbye, {session.username}! See you soon. 👋")
         sys.exit()
@@ -412,6 +441,10 @@ def handle_command(command: str, session: Session) -> bool:
 
     if command == "categories":
         show_categories(session)
+        return True
+
+    if command == "insights":
+        show_insights(session)
         return True
 
     return False
@@ -458,6 +491,7 @@ def chat_loop(session: Session):
     Args:
         session: Current Session instance
     """
+
     console.print()
     console.print(Panel.fit(
         f"[bold green]Session started[/bold green] — logged in as "
@@ -467,6 +501,18 @@ def chat_loop(session: Session):
         border_style="dim"
     ))
     console.print()
+
+    # insights alert
+    from agent.insights import run_all
+    month = datetime.now().strftime("%Y-%m")
+    insights = run_all(session.bridge, month)
+    if insights:
+        console.print(
+            f"[dim cyan]💡 {len(insights)} insight(s) this month — "
+            f"type [bold]insights[/bold] to view[/dim cyan]"
+        )
+        console.print()
+
 
     if DEBUG: print(f"[STATE] mode: {session.state.mode}")
     while True:
