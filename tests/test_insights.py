@@ -6,7 +6,6 @@ No pytest. MockBridge returns controlled data.
 
 import sys
 from pathlib import Path
-from datetime import date, timedelta
 
 sys.path.append(str(Path(__file__).parent.parent))
 

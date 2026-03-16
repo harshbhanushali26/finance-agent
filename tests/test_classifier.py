@@ -8,7 +8,7 @@ No pytest. No real data.
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).parent))
+sys.path.append(str(Path(__file__).parent.parent))
 
 from agent.classifier import classify_intent
 

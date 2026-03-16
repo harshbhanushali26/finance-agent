@@ -6,6 +6,8 @@ from datetime import datetime
 from agent.state import DependencyState
 from bridge.expense_bridge import ExpenseBridge
 
+from config import TOOL_RESULTS_TO_KEEP, TOOL_RESULT_TRIM_LENGTH
+
 
 # file path for getting system prompt
 SYSTEM_PROMPT_FILEPATH = Path(__file__).parent / "prompts" / "system_prompt.md"
@@ -157,12 +159,12 @@ class Session:
         tool_indices = [i for i, m in enumerate(self.history) if m.get("role") == "tool"]
         
         # keep last 4 tool results intact
-        to_trim = tool_indices[:-4] if len(tool_indices) > 4 else []
+        to_trim = tool_indices[:-TOOL_RESULTS_TO_KEEP] if len(tool_indices) > TOOL_RESULTS_TO_KEEP else []
         
         for i in to_trim:
             content = self.history[i].get("content", "")
             # keep only first 60 chars — enough for context
-            if len(content) > 60:
-                self.history[i]["content"] = content[:60] + "... [trimmed]"
+            if len(content) > TOOL_RESULT_TRIM_LENGTH:
+                self.history[i]["content"] = content[:TOOL_RESULT_TRIM_LENGTH] + "... [trimmed]"
 
 

@@ -10,14 +10,9 @@ from tools import registry
 from dotenv import load_dotenv
 from groq import Groq, BadRequestError
 from agent.classifier import classify_intent
+from config import MODEL, MAX_TOOL_CALLS, DEBUG, MAX_HISTORY_MESSAGES
 
 load_dotenv()
-
-MAX_TOOL_CALLS = 5
-# MODEL = "openai/gpt-oss-120b"  
-MODEL = "openai/gpt-oss-20b"    
-
-DEBUG = False  # set False in production
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
@@ -38,7 +33,7 @@ def run(user_message: str, session) -> str:
     # Trim tool result from history
     session.trim_old_tool_results()
 
-    if session.message_count > 20:
+    if session.message_count > MAX_HISTORY_MESSAGES:
         session.clear_history()
 
     session.add_message("user", user_message)
@@ -114,7 +109,7 @@ def run(user_message: str, session) -> str:
             session.add_message("assistant", final_response)
 
             # auto-clear after response — never during active delete/update flow
-            if session.message_count > 20 and session.state.mode == "idle":
+            if session.message_count > MAX_HISTORY_MESSAGES and session.state.mode == "idle":
                 session.clear_history()
                 session.add_system_prompt()
 
@@ -153,7 +148,7 @@ def run(user_message: str, session) -> str:
             session.add_message("assistant", final_response)
 
             # auto-clear after response — never during active delete/update flow
-            if session.message_count > 20 and session.state.mode == "idle":
+            if session.message_count > MAX_HISTORY_MESSAGES and session.state.mode == "idle":
                 session.clear_history()
                 session.add_system_prompt()
 

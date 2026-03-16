@@ -6,6 +6,8 @@ Reads and writes data/config_u001.json directly.
 import json
 from pathlib import Path
 
+from config import DEFAULT_CURRENCY, DEFAULT_BUDGET_WARNING_PERCENT, DEFAULT_LOW_BALANCE_ALERT
+
 DATA_DIR = Path(__file__).parent.parent / "data"
 
 def _get_config_filepath(user_id: str) -> Path:
@@ -18,9 +20,9 @@ def _load_config(user_id: str) -> dict:
         return {
             "user_id": user_id,
             "monthly_income": 0,
-            "currency": "INR",
+            "currency": DEFAULT_CURRENCY,
             "monthly_budget": {"total": 0, "categories": {}},
-            "alerts": {"budget_warning_percent": 80, "low_balance_alert": 5000},
+            "alerts": {"budget_warning_percent": DEFAULT_BUDGET_WARNING_PERCENT, "low_balance_alert": DEFAULT_LOW_BALANCE_ALERT},
             "preferences": {"date_format": "DD-MM-YYYY"}
         }
     try:

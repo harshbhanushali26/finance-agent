@@ -1,36 +1,19 @@
-"""Budget tools — handler functions for setting and checking budgets.
+"""Budget tools — LLM-callable handler functions for setting and checking budgets.
 
-Reads and writes data/budgets_u001.json directly — no ExpenseManager involved.
+Reads and writes budget data via agent.utils helpers (_load_budgets, _save_budgets).
+No ExpenseManager involved — budget data lives in data/budgets_{user_id}.json separately.
+
+Functions:
+    set_budget        — set monthly category budget limit
+    get_budget_status — current usage vs limit per category
+    check_overspend   — flag categories over or near limit
+    suggest_budget    — recommend limits based on 3-month average
+    _get_avg_spend    — internal helper for average category spend
 """
 
-import json
-from pathlib import Path
 from datetime import datetime
-from agent.utils import get_last_n_months
+from agent.utils import get_last_n_months, _save_budgets, _load_budgets, _get_budget_filepath
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-
-
-def _get_budget_filepath(user_id: str) -> Path:
-    return DATA_DIR / f"budgets_{user_id}.json"
-
-
-def _load_budgets(user_id: str) -> dict:
-    filepath = _get_budget_filepath(user_id)
-    if not filepath.exists():
-        return {}
-    try:
-        with open(filepath, "r") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        return {}
-
-
-def _save_budgets(user_id: str, budgets: dict):
-    filepath = _get_budget_filepath(user_id)
-    filepath.parent.mkdir(parents=True, exist_ok=True)
-    with open(filepath, "w") as f:
-        json.dump(budgets, f, indent=4)
 
 
 def set_budget(args: dict, session) -> str:
@@ -151,52 +134,3 @@ def suggest_budget(args: dict, session) -> str:
     except Exception as e:
         return f"Error getting budget suggestions: {str(e)}"
 
-
-def _carry_forward_budgets(user_id: str, session) -> list[str]:
-    """On 1st of month, carry forward unused budget from previous month."""
-    from datetime import datetime
-    
-    today = datetime.now()
-    if today.day != 1:
-        return []
-    
-    current_month = today.strftime("%Y-%m")
-    # previous month
-    prev_month_num = today.month - 1
-    prev_year = today.year
-    if prev_month_num == 0:
-        prev_month_num = 12
-        prev_year -= 1
-    prev_month = f"{prev_year}-{prev_month_num:02d}"
-    
-    budgets = _load_budgets(user_id)
-    
-    # check if carry-forward already done this month
-    carried_key = f"_carried_{current_month}"
-    if budgets.get(carried_key):
-        return []
-    
-    if prev_month not in budgets:
-        return []
-    
-    prev_budgets = budgets[prev_month]
-    prev_summary = session.bridge.get_monthly_summary(prev_month)
-    prev_breakdown = prev_summary.get("breakdown", {})
-    
-    if current_month not in budgets:
-        budgets[current_month] = {}
-    
-    carried = []
-    for category, limit in prev_budgets.items():
-        spent = prev_breakdown.get(category, 0)
-        remaining = limit - spent
-        if remaining > 0:
-            current_limit = budgets[current_month].get(category, 0)
-            budgets[current_month][category] = current_limit + remaining
-            carried.append(f"{category}: +₹{remaining:,.0f}")
-    
-    if carried:
-        budgets[carried_key] = True
-        _save_budgets(user_id, budgets)
-    
-    return carried
