@@ -101,23 +101,44 @@ User Input
 | Special commands bypass LLM       | Instant response, zero token usage |
 | Pydantic → Groq schema converter  | Tools defined in 5 lines each; no manual JSON schemas |
 | Model choice                      | `openai/gpt-oss-120b` via Groq for reliable tool-calling format |
+| `cli.py` + `utils.py` separation  | Display logic isolated from data fetching — cli.py is pure Rich output, utils.py is pure data |
+| `config.py`                       | All hardcoded constants in one place — model, limits, defaults |
 
 ## Project Structure
 
 ```
 finance-agent/
-├── agent/          # LLM loop, session, state and CLI
-├── bridge/         # Only connection to expense-tracker
-├── tools/          # All tool handlers and schemas
-├── prompts/        # System prompt
-├── data/           # JSON files (symlinked)
+├── agent/
+│      ├── core.py              # LLM loop + tool calling
+│      ├── session.py           # user session + history
+│      ├── state.py             # DependencyState — delete/update flow
+│      ├── cli.py               # Rich display — all terminal output
+│      ├── utils.py             # shared data fetching + file I/O helpers
+│      ├── classifier.py        # intent-based tool filtering
+│      ├── pattern_matcher.py   # regex router — bypasses LLM for common queries
+│      ├── insights.py          # pattern detection — 6 detectors
+│      └── prompts/
+│             └── system_prompt.md
+├── bridge/
+│      ├── __init__.py
+│      ├── expense_bridge.py    # only connection to expense-tracker
+│      └── auth_helper.py       # login/signup wrappers
+├── tools/
+│      ├── registry.py          # tool schemas + intent→tools mapping
+│      ├── schemas.py           # Pydantic models + Groq schema converter
+│      ├── transactions.py      # add/view/stage_delete/stage_update
+│      ├── analytics.py         # summaries, breakdowns, top categories
+│      ├── budget.py            # set/check/suggest budgets
+│      └── settings.py          # config, income, preferences
 ├── tests/
 │      ├── __init__.py
 │      ├── test_pattern_matcher.py
-|      ├── test_insights.py
-|      └── test_classifier.py
-├── main.py
-├── .env
+│      ├── test_classifier.py
+│      └── test_insights.py
+├── data/                        # symlinked to expense-tracker/data
+├── config.py                    # app-wide constants — model, limits, defaults
+├── main.py                      # entry point — auth, chat loop, command handling
+├── .env                         # GROQ_API_KEY
 └── pyproject.toml
 ```
 
